@@ -13,7 +13,7 @@
         = t('.by')
         - if translation.translator == current_user
           = t('.you')
-        - else
+        - elsif translation.translator.present?
           = translation.translator.send(TranslationCenter::CONFIG['identifier_type'])
         = t('.on_date')
         = format_date(translation.created_at)

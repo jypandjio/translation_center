@@ -87,7 +87,11 @@ module TranslationCenter
     end
 
     # Make sure we've loaded the translations
-    I18n.backend.send(:init_translations)
+    if TranslationCenter::CONFIG['i18n_source']  == 'db'
+      I18n.backend.send(:load_translations_without_db)
+    else
+      I18n.backend.send(:load_translations)
+    end
     puts "#{I18n.available_locales.size} #{I18n.available_locales.size == 1 ? 'locale' : 'locales'} available: #{I18n.available_locales.join(', ')}"
 
     # Get all keys from all locales
@@ -106,24 +110,13 @@ module TranslationCenter
 
   def self.db2yaml(locale=nil)
     locales = locale.blank? ? I18n.available_locales : [locale.to_sym]
-
-    # for each locale build a hash for the translations and write to file
-    locales.each do |locale|
-      result = {}
-      I18n.locale = locale
-      puts "Started exporting translations in #{locale}"
-      TranslationCenter::TranslationKey.translated(locale).each do |key|
-        begin
-          key.add_to_hash(result, locale)  
-        rescue
-          puts "Error writing key: #{key.name} to yaml for #{locale}"
-        end
+    translations = I18n.backend.send(:load_translations_with_db)
+    translations.each do |k, v|
+      File.open("config/#{k.to_s}.yml", "w") do |file|
+        file.write(v.to_yaml)
       end
-      File.open("config/locales/#{locale.to_s}.yml", 'w') do |file|
-        file.write({locale.to_s => result}.ya2yaml)
-      end
-      puts "Done exporting translations of #{locale} to #{locale.to_s}.yml"
-    end 
+      puts "Done exporting translations of #{k} to #{k.to_s}.yml"
+    end
   end
 
 end

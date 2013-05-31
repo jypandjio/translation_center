@@ -19,7 +19,9 @@ module TranslationCenter
 
   def self.included(base)
     base.class_eval do
-      alias_method_chain :translate, :adding if(TranslationCenter::CONFIG['enabled'])
+      if TranslationCenter::CONFIG['i18n_source']  == 'db'
+        alias_method_chain :load_translations, :db
+      end
     end
   end
 
@@ -33,50 +35,21 @@ module TranslationCenter
     end
   end
 
-  # make sure the complete key is build using the options such as scope and count
-  def prepare_key(key, options)
-    complete_key  = key
-
-    # if a scope is passed in options then build the full key
-    complete_key = options[:scope].present? ? "#{options[:scope].to_s}.#{complete_key}" : complete_key
-
-    # add the correct count suffix
-    if options[:count].present? && options[:count] == 1
-      complete_key = "#{complete_key}.one"
-    elsif options[:count].present? && options[:count] != 1
-      complete_key = "#{complete_key}.other"
-    end
-    complete_key
+  def load_translations_with_db
+    load_file_with_db
   end
 
-  def translate_with_adding(locale, key, options = {})
-    # handle calling translation with a blank key
-    # or translation center tables don't exist
-    return translate_without_adding(locale, key, options) if key.blank? || !ActiveRecord::Base.connection.table_exists?('translation_center_translation_keys')
-
-    complete_key = prepare_key(key, options) # prepare complete key
-
-    # add the new key or update it
-    translation_key = TranslationCenter::TranslationKey.find_or_create_by_name(complete_key)
-    #  UNCOMMENT THIS LATER TO SET LAST ACCESSED AT
-    # translation_key.update_attribute(:last_accessed, Time.now)
-
-    # save the default value (Which is the titleized key name as the translation) if the option is enabled and no translation exists for that key in the db
-    translation_key.create_default_translation if TranslationCenter::CONFIG['save_default_translation'] && translation_key.translations.in(:en).empty?
-
-    # if i18n_source is set to db and not overriden by options then fetch from db
-    if TranslationCenter::CONFIG['i18n_source']  == 'db' && options.delete(:yaml).blank?
-      val = translation_key.accepted_translation_in(locale).try(:value) || options[:default]
-      # replace variables in a translation with passed values
-      options.each_pair{ |key, value| val.gsub!("%{#{key.to_s}}", value.to_s) } if val.is_a?(String)
-      throw(:exception, I18n::MissingTranslation.new(locale, complete_key, options)) unless val
-      wrap_span(val, translation_key)
-    else
-      # just return the normal I18n translation
-      wrap_span(translate_without_adding(locale, key, options), translation_key)
+  def load_file_with_db
+    data = {}
+    translations = TranslationCenter::Translation.select('name, value, lang').joins(:translation_key).where(status: "accepted")
+    translations.each do |translation|
+      t = [translation.lang, translation.name.split(".")].flatten.reverse
+      value = {t.shift => translation.value}
+      values = t.inject(value) {|hash, k| {k => hash}}
+      data.deep_merge!(values)
     end
+    data.each { |locale, d| store_translations(locale, d || {}) }
   end
-
 
   # load tha translation config
   if FileTest.exists?("config/translation_center.yml")
@@ -86,15 +59,30 @@ module TranslationCenter
     TranslationCenter::CONFIG['translator_type'] ||= 'User'
   else
     puts "WARNING: translation_center will be using default options if config/translation_center.yml doesn't exists"
-    TranslationCenter::CONFIG = {'enabled' => false, 'inspector' => 'missing', 'lang' => {'en' => {'name' => 'English', 'direction' => 'ltr'}}, 'yaml_translator_identifier' => 'coder@tc.com', 'i18n_source' => 'yaml', 'yaml2db_translations_accepted' => true,
+    TranslationCenter::CONFIG = {'enabled' => true, 'inspector' => 'all', 'lang' => {'en' => {'name' => 'English', 'direction' => 'ltr'}, 'nl' => {'name' => 'Dutch', 'direction' => 'ltr'}}, 'yaml_translator_identifier' => 'coder@tc.com', 'i18n_source' => 'db', 'yaml2db_translations_accepted' => true,
                                 'accept_admin_translations' => true,  'save_default_translation' => true, 'identifier_type' => 'email', 'translator_type' => 'User' }
   end
   I18n.available_locales = TranslationCenter::CONFIG['lang'].keys
 
 end
 
-# override html_message to add a class to the returned span
 module I18n
+  class ExceptionHandler
+    def call(exception, locale, key, options)
+      if exception.is_a?(MissingTranslation)
+        if TranslationCenter::CONFIG['enabled'] && ActiveRecord::Base.connection.table_exists?('translation_center_translation_keys')
+          key_names = exception.keys
+          key_names.shift
+          key_name_string = key_names.join(".")
+          translation_key = TranslationCenter::TranslationKey.find_or_create_by_name(key_name_string)
+          translation_key.create_default_translation if TranslationCenter::CONFIG['save_default_translation'] && translation_key.translations.in(:en).empty?
+        end
+      end
+      super
+    end
+  end
+
+  # override html_message to add a class to the returned span
   class MissingTranslation
     module Base
       # added another class to be used
@@ -103,7 +91,7 @@ module I18n
         key = keys.last.to_s.gsub('_', ' ').gsub(/\b('?[a-z])/) { $1.capitalize }
         translation_key = keys
         # remove locale
-        translation_key.shift
+        # translation_key.shift
 
         translation_key = TranslationCenter::TranslationKey.find_by_name(translation_key.join('.'))
         # don't put the inspector class if inspector is off or the key belongs to translation_center

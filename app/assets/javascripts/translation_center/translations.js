@@ -217,7 +217,6 @@ function editableKeyTranslations(){
 
   $.each($('.key_editable'), function(){
     var key_id = $(this).attr('data-key-id');
-
     $(this).editable(Routes.translation_center_translation_key_path(key_id, {format: 'json'}), {
       method: 'PUT',
       onblur : 'submit',

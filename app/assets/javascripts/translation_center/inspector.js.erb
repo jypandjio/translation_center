@@ -9,8 +9,8 @@ $(document).ready(function() {
 
   // for each key add a link that goes to the key page
   $('.tc-inspector-key').each(function(){
-    var top = $(this).offset().top - 20;
-    var left = $(this).offset().left - 10;
+    var top = $(this).offset().top;
+    var left = $(this).offset().left - 20;
     var id = $(this).data('id');
     // missing translation will be in red while translated will be in green
     var badgeClass = getBadge($(this).data('type'));

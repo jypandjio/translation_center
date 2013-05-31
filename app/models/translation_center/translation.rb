@@ -27,6 +27,7 @@ module TranslationCenter
     scope :sorted_by_votes, where('votable_type IS NULL OR votable_type = ?', 'TranslationCenter::Translation').select('translation_center_translations.*, count(votes.id) as votes_count').joins('LEFT OUTER JOIN votes on votes.votable_id = translation_center_translations.id').group('translation_center_translations.id').order('votes_count desc')
 
     after_save :update_key_status
+    after_save :reload_i18n
     after_destroy :notify_key
 
     # called after save to update the key status
@@ -81,6 +82,10 @@ module TranslationCenter
         false
         self.errors.add(:lang, I18n.t('.one_translation_per_lang_per_key'))
       end
+    end
+
+    def reload_i18n
+      I18n.reload!
     end
 
   end
