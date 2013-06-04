@@ -112,7 +112,7 @@ module TranslationCenter
     locales = locale.blank? ? I18n.available_locales : [locale.to_sym]
     translations = I18n.backend.send(:load_translations_with_db)
     translations.each do |k, v|
-      File.open("config/#{k.to_s}.yml", "w") do |file|
+      File.open("config/locales/#{k.to_s}.yml", "w") do |file|
         file.write(v.to_yaml)
       end
       puts "Done exporting translations of #{k} to #{k.to_s}.yml"
