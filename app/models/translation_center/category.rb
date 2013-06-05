@@ -5,6 +5,8 @@ module TranslationCenter
 
     alias_method :keys, :translation_keys
 
+    after_save :reload_i18n
+
     # validations
     validates :name, presence: true, uniqueness: true
 
@@ -42,6 +44,11 @@ module TranslationCenter
     def view_name
       self.name.titleize
     end
+
+    private
+      def reload_i18n
+        I18n.reload!
+      end
 
   end
 end

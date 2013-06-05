@@ -11,6 +11,7 @@ module TranslationCenter
 
     # called after key is created or updated
     before_save :add_category
+    after_save :reload_i18n
 
     PER_PAGE = 7
 
@@ -170,6 +171,10 @@ module TranslationCenter
           all_translations[current_level].merge!( add_to_hash_rec(all_translations[current_level],levels, lang) )
           all_translations
         end
+      end
+
+      def reload_i18n
+        I18n.reload!
       end
 
   end
