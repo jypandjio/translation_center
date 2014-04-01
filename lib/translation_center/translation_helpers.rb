@@ -4,7 +4,7 @@ module TranslationCenter
   def self.prepare_translator
 
     translator = TranslationCenter::CONFIG['translator_type'].camelize.constantize.where(TranslationCenter::CONFIG['identifier_type'] => TranslationCenter::CONFIG['yaml_translator_identifier']).first
-    
+
     # if translator doesn't exist then create him
     if translator.blank?
       translator = TranslationCenter::CONFIG['translator_type'].camelize.constantize.new(TranslationCenter::CONFIG['identifier_type'] => TranslationCenter::CONFIG['yaml_translator_identifier'])
@@ -37,6 +37,8 @@ module TranslationCenter
 
   def load_translations_with_db
     load_file_with_db
+    rb_files = I18n.load_path.select{|filename| File.extname(filename).tr('.', '').downcase == 'rb'}
+    rb_files.each {|file| load_file(file)}
   end
 
   def load_file_with_db

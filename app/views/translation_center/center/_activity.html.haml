@@ -20,7 +20,7 @@
       - translations_changes.each do |change|
         %tr
           %td
-            = link_to change.auditable.key.name, change.auditable.key, target: '_blank'
+            = link_to(change.auditable.key.name, change.auditable.key, target: '_blank') if change.auditable.key
           %td
             = change.auditable.lang
           %td
